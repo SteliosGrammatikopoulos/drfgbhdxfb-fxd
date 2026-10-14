@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="el">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Φωνητική Πληκτρολόγηση → Google Docs</title>
+<style>
+  :root{
+    --bg:#f1f3f4; --card:#ffffff; --ink:#202124; --muted:#5f6368;
+    --blue:#1a73e8; --blue-dark:#1557b0; --red:#ea4335; --green:#34a853;
+    --amber:#b06000; --border:#dadce0; --radius:14px;
+  }
+  *{box-sizing:border-box; margin:0; padding:0}
+  html,body{height:100%}
+  body{
+    font-family:'Segoe UI',system-ui,-apple-system,Roboto,'Helvetica Neue',Arial,sans-serif;
+    background:var(--bg); color:var(--ink);
+    display:flex; flex-direction:column; height:100vh; overflow:hidden;
+  }
+
+  header{
+    background:#202124; color:#fff; padding:10px 18px;
+    display:flex; align-items:center; gap:14px; flex-wrap:wrap;
+    box-shadow:0 2px 8px rgba(0,0,0,.25); z-index:5;
+  }
+  header h1{font-size:17px; font-weight:600; letter-spacing:.2px}
+  .badge{font-size:12.5px; padding:4px 12px; border-radius:999px; background:#3c4043; color:#e8eaed; transition:.25s}
+  .badge.listen{background:var(--red); color:#fff; animation:pulse 1.4s infinite}
+  .badge.ok{background:var(--green)}
+  .badge.err{background:var(--amber)}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.55}}
+
+  main{flex:1; display:grid; grid-template-columns:minmax(380px,42%) 1fr; gap:14px; padding:14px; min-height:0}
+  .panel{
+    background:var(--card); border-radius:var(--radius);
+    box-shadow:0 1px 3px rgba(60,64,67,.3);
+    display:flex; flex-direction:column; min-height:0; overflow:hidden;
+  }
+
+  /* ---- Αριστερό πάνελ: έλεγχος & κείμενο ---- */
+  .left{padding:14px; gap:12px; overflow-y:auto}
+  .toolbar{display:flex; flex-wrap:wrap; gap:10px; align-items:center}
+  .mic-btn{
+    width:64px; height:64px; border-radius:50%; border:none; cursor:pointer;
+    font-size:26px; background:#e8f0fe; color:var(--blue);
+    display:flex; align-items:center; justify-content:center; flex:none;
+    transition:.2s; box-shadow:0 2px 6px rgba(26,115,232,.35);
+  }
+  .mic-btn:hover{background:#d2e3fc}
+  .mic-btn.on{background:var(--red); color:#fff; animation:pulse 1.4s infinite; box-shadow:0 0 0 8px rgba(234,67,53,.15)}
+  .mic-btn:disabled{opacity:.45; cursor:not-allowed}
+
+  .btn{
+    border:1px solid var(--border); background:#fff; color:var(--ink);
+    border-radius:8px; padding:9px 14px; font-size:13.5px; cursor:pointer;
+    transition:.15s; display:inline-flex; align-items:center; gap:6px;
+    text-decoration:none; font-family:inherit;
+  }
+  .btn:hover{background:#f8f9fa; border-color:#bdc1c6}
+  .btn.primary{background:var(--blue); border-color:var(--blue); color:#fff}
+  .btn.primary:hover{background:var(--blue-dark)}
+  .btn:disabled{opacity:.5; cursor:not-allowed}
+
+  select, input[type=text]{
+    border:1px solid var(--border); border-radius:8px; padding:9px 10px;
+    font-size:13.5px; background:#fff; color:var(--ink); font-family:inherit;
+  }
+  select:focus, input:focus{outline:2px solid var(--blue); outline-offset:-1px}
+
+  .switches{display:flex; flex-wrap:wrap; gap:8px 16px; font-size:13px; color:var(--muted)}
+  .switches label{display:inline-flex; align-items:center; gap:6px; cursor:pointer}
+  .switches input{accent-color:var(--blue); width:15px; height:15px}
+
+  .interim{
+    min-height:24px; font-size:14px; color:var(--muted); font-style:italic;
+    border-left:3px solid var(--border); padding:2px 10px;
+  }
+  .interim:empty{border-color:transparent}
+
+  textarea#transcript{
+    flex:1; width:100%; resize:none; border:1px solid var(--border); border-radius:10px;
+    padding:12px; font-size:15px; line-height:1.55; font-family:inherit; min-height:150px;
+    background:#fffdfd;
+  }
+  textarea#transcript:focus{outline:2px solid var(--blue); outline-offset:-1px}
+
+  .counter{font-size:12px; color:var(--muted); text-align:right}
+  .actions{display:flex; flex-wrap:wrap; gap:8px}
+
+  .settings{
+    border:1px solid var(--border); border-radius:10px; padding:12px;
+    display:none; flex-direction:column; gap:8px; background:#f8f9fa;
+  }
+  .settings.open{display:flex}
+  .settings .row{display:flex; gap:8px; flex-wrap:wrap}
+  .settings input{flex:1; min-width:220px}
+  .hint{font-size:12.5px; color:var(--muted); line-height:1.55}
+  .hint code, .help code{background:#eceff1; padding:1px 5px; border-radius:4px; font-size:12px}
+
+  details.help{
+    border:1px solid #f3d9a4; border-radius:10px; padding:10px 14px;
+    font-size:13.5px; background:#fef7e0;
+  }
+  details.help summary{cursor:pointer; font-weight:600; user-select:none}
+  details.help p{margin:9px 0 3px; font-weight:600; color:#7a4b00}
+  details.help ul, details.help ol{margin:4px 0 8px 20px; line-height:1.65}
+  details.help li{margin:2px 0}
+
+  /* ---- Δεξί πάνελ: το έγγραφο ---- */
+  .doc-head{
+    display:flex; align-items:center; justify-content:space-between; gap:8px;
+    padding:10px 14px; border-bottom:1px solid var(--border); background:#f8f9fa; flex-wrap:wrap;
+  }
+  .doc-head .t{font-size:13.5px; font-weight:600; color:var(--muted)}
+  .doc-head .grp{display:flex; gap:8px; flex-wrap:wrap}
+  iframe#docFrame{flex:1; width:100%; border:none; background:#fff; min-height:0}
+
+  /* ---- Ειδοποιήσεις ---- */
+  #toasts{
+    position:fixed; left:16px; bottom:16px; z-index:99;
+    display:flex; flex-direction:column; gap:8px; max-width:min(500px, calc(100vw - 32px));
+  }
+  .toast{
+    padding:11px 16px; border-radius:10px; font-size:13.5px; color:#fff;
+    box-shadow:0 4px 14px rgba(0,0,0,.25); animation:slideIn .25s ease;
+    line-height:1.5; white-space:pre-line;
+  }
+  .toast.ok{background:var(--green)}
+  .toast.warn{background:var(--amber)}
+  .toast.err{background:var(--red)}
+  .toast.info{background:#3c4043}
+  @keyframes slideIn{from{transform:translateY(12px); opacity:0}to{transform:none; opacity:1}}
+
+  /* ---- Κινητά ---- */
+  @media (max-width:900px){
+    html,body{height:auto; overflow:auto}
+    main{display:flex; flex-direction:column; overflow:visible}
+    .panel.doc{min-height:65vh}
+    .panel.left{overflow:visible}
+    textarea#transcript{min-height:120px}
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>🎤 Φωνητική Πληκτρολόγηση → Google Docs</h1>
+  <span id="statusBadge" class="badge">Έτοιμο</span>
+</header>
+
+<main>
+  <!-- ΑΡΙΣΤΕΡΟ ΠΑΝΕΛ: ΕΛΕΓΧΟΣ & ΚΕΙΜΕΝΟ -->
+  <section class="panel left" aria-label="Έλεγχος φωνητικής πληκτρολόγησης">
+
+    <div class="toolbar">
+      <button id="micBtn" class="mic-btn" title="Έναρξη / Διακοπή ακρόασης" aria-label="Έναρξη / Διακοπή ακρόασης">🎤</button>
+      <select id="langSel" title="Γλώσσα αναγνώρισης" aria-label="Γλώσσα αναγνώρισης">
+        <option value="el-GR" selected>Ελληνικά (el-GR)</option>
+        <option value="en-US">English (US)</option>
+        <option value="en-GB">English (UK)</option>
+      </select>
+      <button id="settingsBtn" class="btn" title="Ρυθμίσεις σύνδεσης">⚙ Ρυθμίσεις</button>
+    </div>
+
+    <div class="switches">
+      <label><input type="checkbox" id="autoSend" checked> Αυτόματη αποστολή μετά τη σιωπή</label>
+      <label><input type="checkbox" id="useCommands" checked> Φωνητικές εντολές</label>
+      <label><input type="checkbox" id="clearAfterSend" checked> Καθαρισμός μετά την αποστολή</label>
+    </div>
+
+    <div id="interim" class="interim" aria-live="polite"></div>
+
+    <textarea id="transcript"
+      placeholder="Εδώ εμφανίζεται το κείμενο της ομιλίας σας… Μπορείτε να το διορθώσετε πριν την αποστολή, ή να επικολλήσετε οτιδήποτε (Ctrl+V) για να σταλεί στο έγγραφο."></textarea>
+    <div class="counter" id="counter">0 λέξεις · 0 χαρακτήρες</div>
+
+    <div class="actions">
+      <button id="sendBtn" class="btn primary">📤 Αποστολή στο Έγγραφο</button>
+      <button id="copyBtn" class="btn">📋 Αντιγραφή</button>
+      <button id="clearBtn" class="btn">🧹 Καθαρισμός</button>
+    </div>
+
+    <div id="settings" class="settings">
+      <div class="hint">
+        Σύνδεση με το Google Apps Script. Αν η σελίδα σερβίρεται <b>μέσα από το Apps Script</b>
+        (google.script.run), δεν χρειάζεται τίποτα εδώ. Σε κάθε άλλη περίπτωση επικολλήστε το
+        <b>URL του Web App</b> (τελειώνει σε <code>/exec</code>) από: Ανάπτυξη → Νέα ανάπτυξη → Web app.
+      </div>
+      <div class="row">
+        <input type="text" id="webappUrl" placeholder="https://script.google.com/macros/s/…/exec" aria-label="URL Web App">
+        <button id="saveUrlBtn" class="btn primary">Αποθήκευση</button>
+      </div>
+      <div class="row">
+        <button id="testBtn" class="btn">🔍 Δοκιμή σύνδεσης</button>
+      </div>
+    </div>
+
+    <details class="help">
+      <summary>❓ Οδηγίες εγκατάστασης &amp; αντιμετώπιση προβλημάτων</summary>
+
+      <p>1) Απαιτήσεις</p>
+      <ul>
+        <li>Προγράμματα περιήγησης: <b>Chrome</b> ή <b>Edge</b> (το Firefox δεν υποστηρίζει το Web Speech API).</li>
+        <li>Η σελίδα πρέπει να τρέχει σε <b>https://</b> ή <b>localhost</b> για να δίνεται η άδεια μικροφώνου.</li>
+      </ul>
+
+      <p>2) Άδεια μικροφώνου</p>
+      <ul>
+        <li>Πατήστε 🎤 και όταν ο browser ρωτήσει, επιλέξτε <b>«Να επιτρέπεται»</b>.</li>
+        <li>Αν το αρνηθήκατε κατά λάθος: κλικ στο εικονίδιο δίπλα στη διεύθυνση → <b>Μικρόφωνο → Να επιτρέπεται</b> → ανανέωση σελίδας.</li>
+      </ul>
+
+      <p>3) Γιατί βλέπω «προεπισκόπηση» του εγγράφου;</p>
+      <ul>
+        <li>Η Google <b>δεν επιτρέπει</b> την ενσωμάτωση της σελίδας <code>/edit</code> σε iframe. Η σελίδα φορτώνει αυτόματα τη μορφή <code>/preview</code> του ίδιου εγγράφου.</li>
+        <li>Για να φαίνεται το έγγραφο: <b>Κοινή χρήση → Γενικά → «Όποιος έχει τον σύνδεσμο» → Θεατής</b>.</li>
+        <li>Το κουμπί <b>«↗ Άνοιγμα για επεξεργασία»</b> ανοίγει το κανονικό <code>/edit</code> σε νέα καρτέλα.</li>
+      </ul>
+
+      <p>4) Ρύθμιση Apps Script (ώστε το κείμενο να μπαίνει στο έγγραφο)</p>
+      <ol>
+        <li>Ανοίξτε το έγγραφο → <b>Επεκτάσεις → Apps Script</b>.</li>
+        <li>Επικολλήστε τον κώδικα του αρχείου <code>Code.gs</code> στο αρχείο <code>Code.gs</code>.</li>
+        <li>(Προαιρετικά, για να σερβίρεται και η ίδια η σελίδα από το Apps Script:) προσθέστε αρχείο HTML με όνομα <code>index</code> (περιεχόμενο: αυτό το index.html) και αρχείο HTML με όνομα <code>script</code> (περιεχόμενο: το script.js).</li>
+        <li><b>Ανάπτυξη → Νέα ανάπτυξη → Τύπος: Web app</b> → Εκτέλεση ως: <b>Εμένα</b> → Πρόσβαση: <b>Όλοι</b> → αντιγράψτε το URL που τελειώνει σε <code>/exec</code>.</li>
+        <li>Επικολλήστε το URL στα <b>⚙ Ρυθμίσεις</b> εδώ → <b>Αποθήκευση</b> → <b>🔍 Δοκιμή σύνδεσης</b>. Στην πρώτη χρήση η Google θα ζητήσει εξουσιοδότηση (Review permissions) — αποδεχτείτε την.</li>
+        <li>⚠️ Μετά από κάθε αλλαγή στον κώδικα: <b>Ανάπτυξη → Διαχείριση αναπτύξεων → ✏️ → Έκδοση: Νέα έκδοση → Ανάπτυξη</b>.</li>
+      </ol>
+
+      <p>5) Φωνητικές εντολές (ελληνικά)</p>
+      <ul>
+        <li>«νέα γραμμή», «νέα παράγραφος», «σημείο», «κόμμα», «ερωτηματικό», «θαυμαστικό», «άνω τελεία», «διαγραφή όλων».</li>
+      </ul>
+
+      <p>6) Σημειώσεις</p>
+      <ul>
+        <li>Η αναγνώριση φωνής του Chrome γίνεται μέσω των διακομιστών της Google — απαιτείται σύνδεση internet.</li>
+        <li>Κάθε αποστολή γράφει το κείμενο ως <b>νέα παράγραφο</b> στο τέλος του εγγράφου.</li>
+        <li>Εναλλακτικά χωρίς Apps Script: 📋 Αντιγραφή και επικόλληση (Ctrl+V) μέσα στο έγγραφο.</li>
+      </ul>
+    </details>
+  </section>
+
+  <!-- ΔΕΞΙ ΠΑΝΕΛ: ΤΟ ΕΓΓΡΑΦΟ -->
+  <section class="panel doc" aria-label="Έγγραφο Google Docs">
+    <div class="doc-head">
+      <span class="t">📄 Το έγγραφο — αυτόματη προεπισκόπηση</span>
+      <span class="grp">
+        <button id="refreshBtn" class="btn" title="Ανανέωση προεπισκόπησης">🔄 Ανανέωση</button>
+        <a id="editLink" class="btn" href="#" target="_blank" rel="noopener" title="Άνοιγμα σε νέα καρτέλα">↗ Άνοιγμα για επεξεργασία</a>
+      </span>
+    </div>
+    <iframe id="docFrame" title="Google Doc"></iframe>
+  </section>
+</main>
+
+<div id="toasts" aria-live="polite"></div>
+
+<!-- Λογική (απλή λειτουργία: τοπικό αρχείο / οποιοσδήποτε web server) -->
+<script src="script.js"></script>
+<!-- Όταν η σελίδα σερβίρεται ΜΕΣΑ από το Google Apps Script, το παρακάτω
+     ενσωματώνει αυτόματα το script (HtmlService include). Σε απλό HTML
+     οι browsers το αγνοούν ως σχόλιο. -->
+<?!= include('script') ?>
+
+</body>
+</html>
